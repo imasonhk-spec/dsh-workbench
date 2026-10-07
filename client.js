@@ -150,58 +150,8 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /* --------------------------- 知识库桥接工具 --------------------------- */
-
-    /** kb 插件自带的底部触发器按钮（footer 区域，非侧栏 nav、非弹窗内部）。
-     *  匹配两种形态：展开态（按钮文字「知识库」）与收起 rail 态（纯图标，
-     *  aria-haspopup="dialog" 且 class 含 trigger）。只认文字会导致侧栏收起时
-     *  找不到触发器，cap:kb 桥接页只能显示「重新打开知识库面板」兜底按钮。 */
-    function findKbTriggerButtons() {
-      const found = []
-      for (const b of document.querySelectorAll('button')) {
-        const byText = (b.textContent || '').trim() === '知识库'
-        const byRail = b.getAttribute('aria-haspopup') === 'dialog' && /trigger/i.test(b.className || '')
-        if (!byText && !byRail) continue
-        if (b.closest('nav')) continue                     /* 侧栏能力包行（本插件注册） */
-        if (b.closest('[class*="Overlay"],[class*="overlay"]')) continue /* 弹窗内部 */
-        if (b.closest('[data-slot="settings.launcher"]')) continue /* DSH 原生设置按钮（rail 态特征与 kb 触发器相同，勿误伤） */
-        found.push(b)
-      }
-      return found
-    }
-
-    /** 程序化打开知识库原生面板（临时恢复显示 → 点击 → 再隐藏）。 */
-    function clickKbTrigger() {
-      const btn = findKbTriggerButtons()[0]
-      if (!btn) return false
-      const row = btn.parentElement
-      const prev = row ? row.style.display : ''
-      if (row) row.style.display = ''
-      try { btn.click() } catch (e) { /* ignore */ }
-      if (row) row.style.display = prev === 'none' ? 'none' : prev
-      return true
-    }
-
-    /* 隐藏 kb 插件底部触发器（能力包行已由本插件统一提供） */
-    let kbObserverStarted = false
-    function syncKbNav() {
-      for (const btn of findKbTriggerButtons()) {
-        const row = btn.parentElement
-        if (row && row.style.display !== 'none') row.style.display = 'none'
-      }
-    }
-    function startKbNavObserver() {
-      if (kbObserverStarted) return
-      kbObserverStarted = true
-      let scheduled = false
-      const mo = new MutationObserver(() => {
-        if (scheduled) return
-        scheduled = true
-        window.requestAnimationFrame(() => { scheduled = false; syncKbNav() })
-      })
-      mo.observe(document.body, { childList: true, subtree: true })
-      syncKbNav()
-    }
+    // 知识库页面由RAG插件直接注册main cap:kb。
+    // 工作台仅保留能力入口；不读取其他插件DOM、不隐藏footer、不自动点击弹窗。
 
     /** RAG sidecar 基址（与 dsh-raganything-kb 的 ragBaseUrl 对齐，含 /mu 前缀）。 */
     function kbApiBase() {
@@ -506,27 +456,6 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function KbWorkbenchPage() {
-      const openedOnce = useRef(false)
-      const open = useCallback(() => { clickKbTrigger() }, [])
-      useEffect(() => {
-        // 首次进入页面自动打开知识库面板；之后可点按钮重开。
-        if (!openedOnce.current) {
-          openedOnce.current = true
-          const t = window.setTimeout(open, 120)
-          return () => window.clearTimeout(t)
-        }
-      }, [open])
-      return h('div', { className: 'wb-root' },
-        h('div', { className: 'wb-kb-page' },
-          h('div', { className: 'wb-eyebrow' }, 'KNOWLEDGE BASE'),
-          h('h2', { style: { margin: 0, fontSize: 26, letterSpacing: '-.02em' } }, '知识库'),
-          h('p', null, '知识库面板已尝试打开。若已关闭，可点击下方按钮重新打开。'),
-          h('button', { className: 'wb-button primary', type: 'button', onClick: open }, '重新打开知识库面板'),
-        ),
-      )
-    }
-
     /** 侧栏图标：接收 {size, active}。 */
     function WorkbenchIcon(props) {
       const size = (props && props.size) || 18
@@ -550,6 +479,39 @@ window.__ModuleLoader__.load({
         h('rect', { x: 3, y: 14, width: 7, height: 7, rx: 1.5 }),
         h('rect', { x: 14, y: 14, width: 7, height: 7, rx: 1.5 }),
       )
+    }
+
+    /* --------------------- wbAutoCollapse-20261005 ---------------------
+       进入能力包「全屏应用」页（知识库/会议助手/政策解读）时，自动把 DSH 左侧导航栏
+       收起为 56px 图标条，把宽度让给插件自身的左侧导航；离开这些页面时恢复原展开态。
+       挂在 shell.overlay（list 槽，常驻挂载、additive），不抢任何既有占用者。
+       判定用槽位标准 hook usePanelInfo 订阅激活主面板；仅宽屏动作（窄屏由框架自动收起）；
+       真实收起态以框架发布的 [data-sidebar-collapsed] / 「收起侧边栏」按钮为准，只在状态
+       确实不符时 toggle。新增同类全屏应用能力包时，把它的 main key 加进下面的列表即可。 */
+    const WB_FULLSCREEN_PANELS = ['cap:kb', 'cap:meeting', 'cap:policy-analysis']
+    const WB_SIDEBAR_AUTO_COLLAPSE_PX = 1024
+
+    /** @param {object} props 由 slots.register 的 inject 注入：
+     *  {usePanelInfo, collapseHostSidebar, restoreHostSidebar}（usePanelInfo 为槽位标准 prop） */
+    function PanelSidebarObserver(props) {
+      const injected = props || {}
+      const { usePanelInfo, collapseHostSidebar, restoreHostSidebar } = injected
+      const activePanelId = typeof usePanelInfo === 'function'
+        ? usePanelInfo((sel) => (sel ? sel.activePanelId : null))
+        : null
+      const collapsedByUs = useRef(false)
+      useEffect(() => {
+        if (typeof window === 'undefined') return
+        if (window.innerWidth < WB_SIDEBAR_AUTO_COLLAPSE_PX) return
+        if (WB_FULLSCREEN_PANELS.indexOf(activePanelId) >= 0) {
+          // 已经是收起态时 collapse 返回 false，不会把「别人收起的」记成我们做的。
+          if (collapseHostSidebar()) collapsedByUs.current = true
+        } else if (collapsedByUs.current) {
+          collapsedByUs.current = false
+          restoreHostSidebar()
+        }
+      }, [activePanelId, collapseHostSidebar, restoreHostSidebar])
+      return null
     }
 
     /* ------------------------------- 入口 ------------------------------- */
@@ -591,10 +553,7 @@ window.__ModuleLoader__.load({
           ),
         )
 
-        // 知识库能力包：桥接 main 面板 + 侧栏能力包行（工作台下方、可折叠可拖拽）。
-        ctx.slots.inject('main', () =>
-          ctx.slots.register({ name: 'main', key: 'cap:kb' }, KbWorkbenchPage),
-        )
+        // 知识库能力入口保持原ID与排序；main cap:kb由RAG插件唯一拥有。
         ctx.slots.inject('sidebar.panellist', () =>
           ctx.slots.register(
             { name: 'sidebar.panellist', id: 'cap:kb', order: 5, label: '知识库' },
@@ -602,7 +561,53 @@ window.__ModuleLoader__.load({
           ),
         )
 
-        startKbNavObserver()
+        /* wbAutoCollapse-20261005：宿主侧栏收起/恢复（供 shell.overlay 观测器调用）。
+           返回值 = 本次是否真的执行了 toggle；只有「我们收起的」才在离开时恢复。 */
+        function hostSidebarCollapsed() {
+          try {
+            if (typeof document === 'undefined') return true
+            const expandedBtn = document.querySelector('button[aria-label="收起侧边栏"], button[aria-label="Collapse sidebar"]')
+            return !expandedBtn || Boolean(document.querySelector('[data-sidebar-collapsed]'))
+          } catch (e) {
+            return true
+          }
+        }
+        function hostLayout() {
+          return ctxRef.get ? ctxRef.get('layout') : ctxRef.layout
+        }
+        function collapseHostSidebar() {
+          try {
+            const layout = hostLayout()
+            if (!layout || typeof layout.toggleSidebar !== 'function') return false
+            if (hostSidebarCollapsed()) return false
+            layout.toggleSidebar()
+            return true
+          } catch (e) {
+            return false
+          }
+        }
+        function restoreHostSidebar() {
+          try {
+            const layout = hostLayout()
+            if (!layout || typeof layout.toggleSidebar !== 'function') return false
+            if (!hostSidebarCollapsed()) return false
+            layout.toggleSidebar()
+            return true
+          } catch (e) {
+            return false
+          }
+        }
+
+        ctx.slots.inject('shell.overlay', () =>
+          ctx.slots.register(
+            {
+              name: 'shell.overlay',
+              id: 'workbench:auto-collapse',
+              inject: () => ({ collapseHostSidebar, restoreHostSidebar }),
+            },
+            PanelSidebarObserver,
+          ),
+        )
 
         const removeStyle = ensureStyle()
         return () => {

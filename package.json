@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-workbench",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "main": "index.js",
@@ -8,8 +8,15 @@
     ".": "./index.js",
     "./client": "./client.js"
   },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml"
+  ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
@@ -21,6 +28,6 @@
   },
   "meta": {
     "title": "工作台",
-    "description": "DSH 工作台能力包框架：安装能力包后左侧导航与工作台首页自动出现入口，卸载后自动消失。"
+    "description": "DSH 工作台能力包框架：保留全局能力入口，知识库由独立主区直接展示。"
   }
 }
