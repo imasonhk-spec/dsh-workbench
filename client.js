@@ -488,7 +488,7 @@ window.__ModuleLoader__.load({
        判定用槽位标准 hook usePanelInfo 订阅激活主面板；仅宽屏动作（窄屏由框架自动收起）；
        真实收起态以框架发布的 [data-sidebar-collapsed] / 「收起侧边栏」按钮为准，只在状态
        确实不符时 toggle。新增同类全屏应用能力包时，把它的 main key 加进下面的列表即可。 */
-    const WB_FULLSCREEN_PANELS = ['cap:kb', 'cap:meeting', 'cap:policy-analysis']
+    const WB_FULLSCREEN_PANELS = ['cap:kb', 'cap:meeting', 'cap:policy-analysis', 'cap:huiwen-ppt']
     const WB_SIDEBAR_AUTO_COLLAPSE_PX = 1024
 
     /** @param {object} props 由 slots.register 的 inject 注入：
