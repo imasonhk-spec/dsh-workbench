@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-workbench",
-  "version": "2.5.3",
+  "version": "2.6.0",
   "private": true,
   "type": "module",
   "main": "index.js",
@@ -11,7 +11,10 @@
   "files": [
     "index.js",
     "client.js",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "package.json",
+    "install-manifest.json",
+    "README.md"
   ],
   "dsh": {
     "bundle": {
