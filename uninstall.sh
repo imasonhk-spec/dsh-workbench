@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PKG_NAME="dsh-workbench"
-PKG_VERSION="2.7.0"
+PKG_VERSION="2.7.1"
 PLUGIN_DIR="@local/dsh-workbench"
 SERVICES=""
 

@@ -1,4 +1,4 @@
-# dsh-workbench 2.7.0
+# dsh-workbench 2.7.1
 
 工作台框架
 
@@ -20,8 +20,8 @@
 ## 安装
 
 ```bash
-tar -xzf dsh-workbench-2.7.0.tar.gz
-cd dsh-workbench-2.7.0
+tar -xzf dsh-workbench-2.7.1.tar.gz
+cd dsh-workbench-2.7.1
 sudo ./install.sh
 ```
 
